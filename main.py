@@ -81,21 +81,38 @@ class TimeCounter:
                 messagebox.showwarning("Invalid Input", "Please enter a valid time.")
         except ValueError:
             messagebox.showwarning("Invalid Input", "Please enter valid numbers.")
-            
 
-    def countdown(self, remaining):
+    def run_next_countdown(self):
         def play_sound(file_path):
             playsound(file_path)
+        if self.current_entry < len(self.entries):
+            time_var, seconds_var, _, _ = self.entries[self.current_entry]
+            try:
+                minutes = int(time_var.get() or "0")
+                seconds = int(seconds_var.get() or "0")
+                total_seconds = minutes * 60 + seconds
+                if total_seconds > 0:
+                    self.countdown(total_seconds)
+                else:
+                    self.current_entry += 1
+                    self.countdown_label.config(text="Ding!")
+                    sound_thread = threading.Thread(target=play_sound, args=('E:/Coding/DotaReminder/sounds/basic-ding.mp3',))
+                    sound_thread.start()
+                    self.run_next_countdown()
+            except ValueError:
+                messagebox.showwarning("Invalid Input", f"Please enter valid numbers for entry {self.current_entry + 1}.")
+        else:
+            self.countdown_label.config(text="All countdowns completed!")        
+
+    def countdown(self, remaining):
         if remaining > 0:
             mins, secs = divmod(remaining, 60)
             time_string = f"{mins:02d}:{secs:02d}"
             self.countdown_label.config(text=time_string)
             self.countdown_id = self.master.after(1000, self.countdown, remaining - 1)
         else:
-            self.countdown_label.config(text="Ding!")
-            sound_thread = threading.Thread(target=play_sound, args=('E:/Coding/DotaReminder/sounds/basic-ding.mp3',))
-            sound_thread.start()
-            self.countdown_id = None
+            self.current_entry += 1
+            self.run_next_countdown()
 
 if __name__ == "__main__":
     root = tk.Tk()
