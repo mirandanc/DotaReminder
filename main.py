@@ -8,83 +8,83 @@ class TimeCounter:
         self.master = master
         self.master.title("Dota reminder")
 
+        self.entries_frame = tk.Frame(master)
+        self.entries_frame.pack(pady=10)
+
         self.entries = []
-        self.add_time_entry()
+        self.repeat_counters = {}
 
-        self.time_var = tk.StringVar()
-        self.time_var.trace("w", self.validate_input)
+        self.button_frame = tk.Frame(master)
+        self.button_frame.pack(pady=10)
 
-        self.minute_entry = tk.Entry(master, textvariable=self.time_var, font=("Arial", 24), justify="center", width=3)
-        self.minute_entry.grid(row=0, column=0, padx=10, pady=10)
-        self.minute_entry.focus_set()
+        self.add_button = tk.Button(self.button_frame, text="+", command=self.add_time_entry, font=("Arial", 14))
+        self.add_button.pack(side=tk.LEFT, padx=5)
 
-        self.colon_label = tk.Label(master, text=":", font=("Arial", 24))
-        self.colon_label.grid(row=0, column=1)
+        self.go_button = tk.Button(self.button_frame, text="Go", command=self.start_countdown, font=("Arial", 18))
+        self.go_button.pack(side=tk.LEFT, padx=5)
 
-        self.seconds_var = tk.StringVar()
-        self.seconds_entry = tk.Entry(master, textvariable=self.seconds_var, font=("Arial", 24), justify="center", width=3)
-        self.seconds_entry.grid(row=0, column=2, padx=10, pady=10)
-
-        self.add_button = tk.Button(master, text="+", command=self.add_time_entry, font=("Arial", 14))
-        self.add_button.pack(pady=10)
-
-        self.go_button = tk.Button(master, text="Go", command=self.start_countdown, font=("Arial", 18))
-        self.go_button.grid(row=1, column=0, columnspan=3, pady=10)
+        self.clear_button = tk.Button(self.button_frame, text="Clear All", command=self.clear_all, font=("Arial", 14))
+        self.clear_button.pack(side=tk.LEFT, padx=5)
 
         self.countdown_label = tk.Label(master, text="", font=("Arial", 24))
-        self.countdown_label.grid(row=2, column=0, columnspan=3, pady=10)
+        self.countdown_label.pack(pady=10)
+
+        self.repeat_labels_frame = tk.Frame(master)
+        self.repeat_labels_frame.pack(pady=10)
 
         self.countdown_id = None
+        self.current_entry = 0
+
+        # Add the first time entry
+        self.add_time_entry()
 
     def add_time_entry(self):
-        frame = tk.Frame(self.master)
+        frame = tk.Frame(self.entries_frame)
         frame.pack(pady=5)
 
         time_var = tk.StringVar()
-        time_var.trace("w", lambda *args, index=len(self.entries): self.validate_input(index, *args))
+        seconds_var = tk.StringVar()
 
-        time_entry = tk.Entry(frame, textvariable=time_var, font=("Arial", 24), justify="center", width=4)
+        time_entry = tk.Entry(frame, textvariable=time_var, font=("Arial", 24), justify="center", width=3)
         time_entry.pack(side=tk.LEFT, padx=5)
 
         colon_label = tk.Label(frame, text=":", font=("Arial", 24))
         colon_label.pack(side=tk.LEFT)
 
-        seconds_var = tk.StringVar()
-        seconds_entry = tk.Entry(frame, textvariable=seconds_var, font=("Arial", 24), justify="center", width=2)
+        seconds_entry = tk.Entry(frame, textvariable=seconds_var, font=("Arial", 24), justify="center", width=3)
         seconds_entry.pack(side=tk.LEFT, padx=5)
+
+        index = len(self.entries)
+        repeat_button = tk.Button(frame, text="Repeat", command=lambda i=index: self.start_repeat(i), font=("Arial", 12))
+        repeat_button.pack(side=tk.LEFT, padx=5)
 
         self.entries.append((time_var, seconds_var, time_entry, seconds_entry))
 
-        if len(self.entries) == 1:
-            time_entry.focus_set()    
+        time_var.trace("w", lambda *args, i=index: self.validate_input(i, *args))
 
-    def validate_input(self, *args):
-        value = self.time_var.get()
-        if len(value) > 4:
-            self.time_var.set(value[:4])
-        if len(value) >= 2:
-            self.time_var.set(value[:2])
-            self.seconds_var.set(value[2:])
-            self.seconds_entry.focus()
+        if len(self.entries) == 1:
+            time_entry.focus_set()
+
+        # Repack the button frame to ensure it stays at the bottom
+        self.button_frame.pack_forget()
+        self.button_frame.pack(pady=10)
+
+    def validate_input(self, index, *args):
+        if 0 <= index < len(self.entries):
+            time_var, seconds_var, _, seconds_entry = self.entries[index]
+            value = time_var.get()
+            if len(value) > 2:
+                time_var.set(value[:2])
+                seconds_var.set(value[2:])
+                seconds_entry.focus()
 
     def start_countdown(self):
-        # Cancel any existing countdown
         if self.countdown_id:
             self.master.after_cancel(self.countdown_id)
-        try:
-            minutes = int(self.time_var.get() or "0")
-            seconds = int(self.seconds_var.get() or "0")
-            total_seconds = minutes * 60 + seconds
-            if total_seconds > 0:
-                self.countdown(total_seconds)
-            else:
-                messagebox.showwarning("Invalid Input", "Please enter a valid time.")
-        except ValueError:
-            messagebox.showwarning("Invalid Input", "Please enter valid numbers.")
+        self.current_entry = 0
+        self.run_next_countdown()
 
     def run_next_countdown(self):
-        def play_sound(file_path):
-            playsound(file_path)
         if self.current_entry < len(self.entries):
             time_var, seconds_var, _, _ = self.entries[self.current_entry]
             try:
@@ -96,25 +96,79 @@ class TimeCounter:
                 else:
                     self.current_entry += 1
                     self.countdown_label.config(text="Ding!")
-                    sound_thread = threading.Thread(target=play_sound, args=('E:/Coding/DotaReminder/sounds/basic-ding.mp3',))
-                    sound_thread.start()
+                    self.play_sound()
                     self.run_next_countdown()
             except ValueError:
                 messagebox.showwarning("Invalid Input", f"Please enter valid numbers for entry {self.current_entry + 1}.")
         else:
-            self.countdown_label.config(text="All countdowns completed!")        
+            self.countdown_label.config(text="All countdowns completed!")
 
     def countdown(self, remaining):
         if remaining > 0:
             mins, secs = divmod(remaining, 60)
-            time_string = f"{mins:02d}:{secs:02d}"
+            time_string = f"Entry {self.current_entry + 1}: {mins:02d}:{secs:02d}"
             self.countdown_label.config(text=time_string)
             self.countdown_id = self.master.after(1000, self.countdown, remaining - 1)
         else:
+            self.countdown_label.config(text="Ding!")
+            self.play_sound()
             self.current_entry += 1
-            self.run_next_countdown()
+            self.master.after(1000, self.run_next_countdown)
+
+    def start_repeat(self, index):
+        if 0 <= index < len(self.entries):
+            time_var, seconds_var, _, _ = self.entries[index]
+            try:
+                minutes = int(time_var.get() or "0")
+                seconds = int(seconds_var.get() or "0")
+                total_seconds = minutes * 60 + seconds
+                if total_seconds > 0:
+                    if index in self.repeat_counters:
+                        self.master.after_cancel(self.repeat_counters[index]['id'])
+                    label = tk.Label(self.repeat_labels_frame, text="", font=("Arial", 18))
+                    label.pack()
+                    self.repeat_counters[index] = {'total': total_seconds, 'remaining': total_seconds, 'label': label}
+                    self.repeat_countdown(index)
+                else:
+                    messagebox.showwarning("Invalid Input", f"Please enter a valid time for entry {index + 1}.")
+            except ValueError:
+                messagebox.showwarning("Invalid Input", f"Please enter valid numbers for entry {index + 1}.")
+
+    def repeat_countdown(self, index):
+        counter = self.repeat_counters[index]
+        if counter['remaining'] > 0:
+            mins, secs = divmod(counter['remaining'], 60)
+            time_string = f"Repeat {index + 1}: {mins:02d}:{secs:02d}"
+            counter['label'].config(text=time_string)
+            counter['remaining'] -= 1
+            counter['id'] = self.master.after(1000, self.repeat_countdown, index)
+        else:
+            self.play_sound()
+            counter['remaining'] = counter['total']
+            self.repeat_countdown(index)
+
+    def play_sound(self):
+        sound_thread = threading.Thread(target=playsound, args=('E:/Coding/DotaReminder/sounds/basic-ding.mp3',))
+        sound_thread.start()
+
+    def clear_all(self):
+        if self.countdown_id:
+            self.master.after_cancel(self.countdown_id)
+        self.countdown_label.config(text="")
+
+        for index, counter in self.repeat_counters.items():
+            self.master.after_cancel(counter['id'])
+            counter['label'].destroy()
+        self.repeat_counters.clear()
+
+        for widget in self.repeat_labels_frame.winfo_children():
+            widget.destroy()
+
+        self.current_entry = 0
+
+        messagebox.showinfo("Clear All", "All countdowns have been cleared.")
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = TimeCounter(root)
-    root.mainloop() 
+    root.mainloop()
