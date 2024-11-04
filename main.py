@@ -1,12 +1,20 @@
 import tkinter as tk
 from tkinter import messagebox
 from playsound import playsound
+from GSIServer import start_server, get_clock_time
 import threading
 
 class TimeCounter:
     def __init__(self, master):
         self.master = master
         self.master.title("Dota reminder")
+
+        start_server()
+
+        self.clock_time_label = tk.Label(master, text="Game Time: 0:00", font=("Arial", 14))
+        self.clock_time_label.pack(pady=5)
+
+        self.update_clock_time()
 
         self.entries_frame = tk.Frame(master)
         self.entries_frame.pack(pady=10)
@@ -146,6 +154,16 @@ class TimeCounter:
             self.play_sound()
             counter['remaining'] = counter['total']
             self.repeat_countdown(index)
+
+    def update_clock_time(self):
+        clock_time = get_clock_time()
+        
+        minutes = clock_time // 60
+        seconds = clock_time % 60
+
+        self.clock_time_label.config(text=f"Game Time: {minutes}:{seconds:02d}")
+
+        self.master.after(1000, self.update_clock_time)
 
     def play_sound(self):
         sound_thread = threading.Thread(target=playsound, args=('E:/Coding/DotaReminder/sounds/basic-ding.mp3',))
